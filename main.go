@@ -43,6 +43,13 @@ func main() {
 	}
 	client := http.Client{
 		Transport: &transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if via[0].URL.String() != req.URL.String() {
+				req.Header["Location"] = []string{req.URL.String()}
+			}
+			return nil
+		},
+		Timeout: time.Duration(5 * time.Second),
 	}
 	var wg sync.WaitGroup
 	for {
@@ -63,12 +70,16 @@ func main() {
 				res, err := client.Get(_url)
 				str := ""
 				if err == nil {
+					redirect := ""
+					if len(res.Request.Header["Location"]) > 0 {
+						redirect = res.Request.Header["Location"][0]
+					}
 					doc, _ := goquery.NewDocumentFromReader(res.Body)
 					title := doc.Find("title").Text()
-					str = fmt.Sprintf("%d|%s|%s|%d|%s", _i, urlParse.Host, address[0], res.StatusCode, title)
+					str = fmt.Sprintf("%d|%s|%s|%d|%s|%s\n", _i, urlParse.Host, address[0], res.StatusCode, title, redirect)
 					fmt.Println(str)
 				} else {
-					str = fmt.Sprintf("%d|%s|%d", _i, urlParse.Host, 500)
+					str = fmt.Sprintf("%d|%s|%d\n", _i, urlParse.Host, 500)
 					fmt.Println(str)
 				}
 				f.WriteString(str)
